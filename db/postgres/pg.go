@@ -17,6 +17,7 @@ var (
 
 type PgInterface interface {
 	BeginTx(context.Context, pgx.TxOptions) (pgx.Tx, error)
+	Close()
 }
 
 // pgDb is a Postgres backend implementation of the Db interface.
@@ -51,14 +52,18 @@ func(pdb *pgDb) WithConnection(pi PgInterface) *pgDb {
 // Connect implements Db.
 func(pdb *pgDb) Connect(ctx context.Context, connStr string) error {
 	if pdb.conn != nil {
-		logg.WarnCtxf(ctx, "already connected", "conn", pdb.conn)
-		panic("already connected")
+		logg.WarnCtxf(ctx, "Pg already connected")
+		return nil
 	}
-	var err error
 	conn, err := pgxpool.New(ctx, connStr)
 	if err != nil {
 		return err
 	}
+	
+	if err := conn.Ping(ctx); err != nil {
+		return fmt.Errorf("connection to postgres could not be established: %w", err)
+	}
+
 	pdb.conn = conn
 	return pdb.Prepare(ctx)
 }
@@ -141,7 +146,7 @@ func (pdb *pgDb) Get(ctx context.Context, key []byte) ([]byte, error) {
 
 // Close implements Db.
 func(pdb *pgDb) Close() error {
-	pdb.Close()
+	pdb.conn.Close()
 	return nil
 }
 
@@ -151,7 +156,6 @@ func(pdb *pgDb) Prepare(ctx context.Context) error {
 		logg.WarnCtxf(ctx, "Prepare called more than once")
 		return nil
 	}
-	pdb.prepd = true
 	tx, err := pdb.conn.BeginTx(ctx, defaultTxOptions)
 	if err != nil {
 		tx.Rollback(ctx)
@@ -175,5 +179,6 @@ func(pdb *pgDb) Prepare(ctx context.Context) error {
 		tx.Rollback(ctx)
 		return err
 	}
+	pdb.prepd = true
 	return nil
 }

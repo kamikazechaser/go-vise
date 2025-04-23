@@ -7,9 +7,7 @@ import (
 	"os"
 )
 
-const (
-	LevelTrace slog.Level = slog.Level(-8)
-)
+const LevelTrace slog.Level = slog.Level(-8)
 
 var _ Logger = (*Slog)(nil)
 
@@ -33,6 +31,7 @@ type (
 	}
 )
 
+// NewSlog creates a new Slog logger instance.
 func NewSlog(o SlogOpts) *Slog {
 	if o.Handler == nil {
 		o.Handler = buildDefaultHandler(os.Stderr, o.LogLevel, o.IncludeSource)
